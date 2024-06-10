@@ -6,13 +6,11 @@
  */
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using API.Logger;
-using UnityEngine;
-using ILogger = API.Logger.ILogger;
 
 namespace Carbon.Test;
 
@@ -21,23 +19,25 @@ public static partial class Integrations
 	[AttributeUsage(AttributeTargets.Method)]
 	public class Test : Attribute
 	{
-		public float Timeout = -1;
-		public bool CancelOnFail = false;
+		public float Timeout = 1000f;
+		public bool CancelOnFail = true;
 
 		public enum StatusTypes
 		{
 			None,
 			Running,
-			Success,
-			Failure,
+			Complete,
+			Failed,
 			Fatal,
 			Timeout
 		}
 
+		internal List<Exception> _exceptions = new();
 		internal Type _type;
 		internal MethodInfo _method;
 		internal object _target;
 		internal StatusTypes _statusType;
+		internal static int _prefixScale;
 
 		internal TimeSpan _duration;
 
@@ -45,6 +45,7 @@ public static partial class Integrations
 
 		public bool IsRunning => Status == StatusTypes.Running;
 		public StatusTypes Status => _statusType;
+		public IEnumerable<Exception> Exceptions => _exceptions.AsEnumerable();
 
 		public void Setup(object target, Type type, MethodInfo info)
 		{
@@ -68,7 +69,15 @@ public static partial class Integrations
 			SetStatus(StatusTypes.Running);
 
 			_args[0] = this;
-			_method.Invoke(_target, _args);
+
+			try
+			{
+				_method.Invoke(_target, _args);
+			}
+			catch (Exception exception)
+			{
+				_exceptions.Add(exception);
+			}
 		}
 
 		public void RunCheck()
@@ -84,18 +93,18 @@ public static partial class Integrations
 			}
 		}
 
-		public void OnSucceed()
+		public void Complete()
 		{
 			if (!IsRunning)
 			{
 				return;
 			}
 
-			SetStatus(StatusTypes.Success);
-			Log($"Success");
+			SetStatus(StatusTypes.Complete);
+			Log($"Complete - {_exceptions.Count} excp.");
 		}
 
-		public void OnTimeout()
+		internal void OnTimeout()
 		{
 			if (!IsRunning)
 			{
@@ -106,18 +115,18 @@ public static partial class Integrations
 			Warn($"Timed out >= {Timeout * 1000:00}ms");
 		}
 
-		public void Fail(string reason, Exception ex = null)
+		public void Fail(string message, Exception ex = null)
 		{
 			if (!IsRunning)
 			{
 				return;
 			}
 
-			SetStatus(StatusTypes.Failure);
-			Error($"Fail - {reason}", ex);
+			SetStatus(StatusTypes.Failed);
+			Error($"Fail - {message}", ex);
 		}
 
-		public void FatalFail(string reason, Exception ex = null)
+		public void FatalFail(string message, Exception ex = null)
 		{
 			if (!IsRunning)
 			{
@@ -125,26 +134,43 @@ public static partial class Integrations
 			}
 
 			SetStatus(StatusTypes.Fatal);
-			Error($"Fatal - {reason}", ex);
+			Error($"Fatal - {message}", ex);
 		}
 
-		public bool ShouldCancel() => Status == StatusTypes.Fatal || (CancelOnFail && Status != StatusTypes.Success);
+		public bool ShouldCancel() => Status == StatusTypes.Fatal || (CancelOnFail && Status != StatusTypes.Complete);
 
-		public virtual string ToPrettyString() => $"{_type.Name}.{_method.Name}|{_duration.TotalMilliseconds:0}ms".ToLower();
+		public virtual string ToPrettyString() => $"{_type.Name}.{_method.Name}|{_duration.TotalMilliseconds:0}ms|".ToLower();
+
+		public void CalculatePrettyString(out string mainString, out string spacing)
+		{
+			mainString = ToPrettyString();
+
+			var currentStringLength = mainString.Length;
+
+			if (currentStringLength > _prefixScale)
+			{
+				_prefixScale = currentStringLength;
+			}
+
+			spacing = new string(' ', _prefixScale - currentStringLength);
+		}
 
 		public void Log(object message)
 		{
-			Logger.Console($"{ToPrettyString()}  {(message == null ? "no message" : message.ToString())}");
+			CalculatePrettyString(out var main, out var second);
+			Logger.Console($"{second}{main}  {(message == null ? "no message" : message.ToString())}");
 		}
 
 		public void Warn(object message)
 		{
-			Logger.Console($"{ToPrettyString()}  {(message == null ? "no message" : message.ToString())}", Severity.Warning);
+			CalculatePrettyString(out var main, out var second);
+			Logger.Console($"{second}{main}  {(message == null ? "no message" : message.ToString())}", Severity.Warning);
 		}
 
 		public void Error(object message, Exception exception)
 		{
-			Logger.Console($"{ToPrettyString()}  {(message == null ? "no message" : message.ToString())}", Severity.Error, exception);
+			CalculatePrettyString(out var main, out var second);
+			Logger.Console($"{second}{main}  {(message == null ? "no message" : message.ToString())}", Severity.Error, exception);
 		}
 
 		public void Fatal(object message, Exception exception)
@@ -156,17 +182,17 @@ public static partial class Integrations
 		[AttributeUsage(AttributeTargets.Method)]
 		public class Assert : Test
 		{
-			public override string ToPrettyString() => base.ToPrettyString() + "|assert";
+			public override string ToPrettyString() => base.ToPrettyString() + "assert|";
 
 			public bool IsTrue(bool condition)
 			{
 				if (condition)
 				{
-					Warn($"IsTrue success - [bool condition] {condition}");
+					Warn($"IsTrue passed    - [bool condition] {condition}");
 ;					return true;
 				}
 
-				Fail($"IsTrue failed - [bool condition] {condition}");
+				Fail($"IsTrue failed    - [bool condition] {condition}");
 				return false;
 			}
 
@@ -174,11 +200,11 @@ public static partial class Integrations
 			{
 				if (!condition)
 				{
-					Warn($"IsFalse success - [bool condition] {condition}");
+					Warn($"IsFalse passed   - [bool condition] {condition}");
 					return true;
 				}
 
-				Fail($"IsFalse failed - [bool condition] {condition}");
+				Fail($"IsFalse failed   - [bool condition] {condition}");
 				return false;
 			}
 
@@ -186,11 +212,11 @@ public static partial class Integrations
 			{
 				if (value == null)
 				{
-					Warn($"IsNull success - [object value] {value}");
+					Warn($"IsNull passed    - [object value] {value}");
 					return true;
 				}
 
-				Fail($"IsNull failed - [object value] {value}");
+				Fail($"IsNull failed    - [object value] {value}");
 				return false;
 			}
 
@@ -198,7 +224,7 @@ public static partial class Integrations
 			{
 				if (value != null)
 				{
-					Warn($"IsNotNull success - [object value] {value}");
+					Warn($"IsNotNull passed - [object value] {value}");
 					return true;
 				}
 

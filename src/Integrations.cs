@@ -51,8 +51,9 @@ public static partial class Integrations
 		while (Queue.Count != 0)
 		{
 			var bed = Queue.Dequeue();
+			var completed = 0;
 
-			Logger.Console($"Initialized Test bed - {bed.Context}");
+			Logger.Console($"initialized testbed - context: {bed.Context}");
 			foreach (var test in bed)
 			{
 				Stopwatch.Restart();
@@ -68,9 +69,11 @@ public static partial class Integrations
 
 				if (test.ShouldCancel())
 				{
-					Logger.Console($"Cancelled due to fatal status - {bed.Context}", Severity.Error);
+					Logger.Console($"cancelled due to fatal status - context: {bed.Context}", Severity.Error);
 					break;
 				}
+
+				completed++;
 
 				if (delay > 0)
 				{
@@ -82,7 +85,7 @@ public static partial class Integrations
 				}
 			}
 
-			Logger.Console($"Completed {bed.Count:n0} tests - {bed.Context}");
+			Logger.Console($"completed {completed:n0} out of {bed.Count:n0} {(bed.Count == 1 ? "test" : "tests")} - context: {bed.Context}");
 
 			yield return null;
 		}

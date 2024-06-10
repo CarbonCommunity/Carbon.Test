@@ -21,11 +21,6 @@
 	  <PackageReference Update="Roslynator.CSharp" Version="4.9.0" />
 	</ItemGroup>
 
-	<ItemGroup>
-	  <Folder Include="src\Attributes\" />
-	  <Folder Include="src\Contracts\" />
-	</ItemGroup>
-
 	<Target Name="CustomRelease" AfterTargets="Build" DependsOnTargets="PrepareRelease">
 		<Copy SourceFiles="$(OutputPath)$(Product).dll" DestinationFolder="$(c_managed)" />
 	</Target>

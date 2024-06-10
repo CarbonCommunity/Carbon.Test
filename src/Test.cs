@@ -7,9 +7,7 @@
 
 using System;
 using System.Reflection;
-using System.Threading.Tasks;
 using API.Logger;
-using API.Plugins;
 
 namespace Carbon.Test;
 
@@ -42,10 +40,11 @@ public class Test : Attribute
 	public bool IsRunning => Status == StatusTypes.Running;
 	public StatusTypes Status => _statusType;
 
-	public void Setup(Type type, MethodInfo info)
+	public void Setup(object target, Type type, MethodInfo info)
 	{
 		_type = type;
 		_method = info;
+		_target = target;
 	}
 	public void SetDuration(TimeSpan span)
 	{

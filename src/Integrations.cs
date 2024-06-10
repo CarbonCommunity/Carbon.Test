@@ -10,6 +10,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
+using API.Logger;
 using UnityEngine;
 using ILogger = API.Logger.ILogger;
 
@@ -19,9 +20,9 @@ public static class Integrations
 {
 	public static ILogger Logger { get; set; }
 	public static Stopwatch Stopwatch { get; } = new();
-	public static Queue<TestBed> TestBeds { get; } = new();
+	public static Queue<TestBed> Queue { get; } = new();
 
-	public static TestBed GetTestBed(string context, Type type)
+	public static TestBed Get(string context, Type type, object target)
 	{
 		var bed = new TestBed(context);
 
@@ -34,16 +35,21 @@ public static class Integrations
 				continue;
 			}
 
-			bed.AddTest(type, method, attribute);
+			bed.AddTest(target, type, method, attribute);
 		}
 
 		return bed;
 	}
-	public static IEnumerator Run(float delay)
+
+	public static void QueueBed(TestBed bed)
 	{
-		while (TestBeds.Count != 0)
+		Queue.Enqueue(bed);
+	}
+	public static IEnumerator RunQueue(float delay)
+	{
+		while (Queue.Count != 0)
 		{
-			var bed = TestBeds.Dequeue();
+			var bed = Queue.Dequeue();
 
 			Logger.Console($"Initialized Test bed - {bed.Context}");
 			foreach (var test in bed)
@@ -61,6 +67,7 @@ public static class Integrations
 
 				if (test.ShouldCancel())
 				{
+					Logger.Console($"Cancelled due to fatal status - {bed.Context}", Severity.Error);
 					break;
 				}
 
@@ -90,9 +97,9 @@ public static class Integrations
 			Context = context;
 		}
 
-		public void AddTest(Type type, MethodInfo method, Test test)
+		public void AddTest(object target, Type type, MethodInfo method, Test test)
 		{
-			test.Setup(type, method);
+			test.Setup(target, type, method);
 			Add(test);
 		}
 	}

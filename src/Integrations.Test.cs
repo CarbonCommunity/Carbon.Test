@@ -7,7 +7,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using API.Logger;
@@ -19,7 +18,7 @@ public static partial class Integrations
 	[AttributeUsage(AttributeTargets.Method)]
 	public class Test : Attribute
 	{
-		public float Timeout = 1000f;
+		public float DurationTimeout = 1000f;
 		public bool CancelOnFail = true;
 
 		public enum StatusTypes
@@ -32,20 +31,21 @@ public static partial class Integrations
 			Timeout
 		}
 
+		#region Internal
+
 		internal List<Exception> _exceptions = new();
 		internal Type _type;
 		internal MethodInfo _method;
 		internal object _target;
 		internal StatusTypes _statusType;
 		internal static int _prefixScale;
-
 		internal TimeSpan _duration;
 
 		internal static object[] _args = new object[1];
 
-		public bool IsRunning => Status == StatusTypes.Running;
-		public StatusTypes Status => _statusType;
-		public IEnumerable<Exception> Exceptions => _exceptions.AsEnumerable();
+		#endregion
+
+		#region Setup
 
 		public void Setup(object target, Type type, MethodInfo info)
 		{
@@ -64,6 +64,16 @@ public static partial class Integrations
 			_statusType = status;
 		}
 
+		#endregion
+
+		#region Runtime
+
+		public bool IsRunning => Status == StatusTypes.Running;
+
+		public StatusTypes Status => _statusType;
+
+		public IEnumerable<Exception> Exceptions => _exceptions.AsEnumerable();
+
 		public void Run()
 		{
 			SetStatus(StatusTypes.Running);
@@ -73,25 +83,41 @@ public static partial class Integrations
 			try
 			{
 				_method.Invoke(_target, _args);
+				Complete();
 			}
 			catch (Exception exception)
 			{
 				_exceptions.Add(exception);
+				Fatal("Runtime method failure", exception);
 			}
 		}
 
 		public void RunCheck()
 		{
-			if (Timeout <= 0)
+			if (DurationTimeout <= 0)
 			{
 				return;
 			}
 
-			if (_duration.TotalSeconds >= Timeout)
+			if (_duration.TotalSeconds >= DurationTimeout)
 			{
-				OnTimeout();
+				Timeout();
 			}
 		}
+
+		public void Reset()
+		{
+			SetStatus(StatusTypes.None);
+
+			_exceptions.Clear();
+			SetDuration(default);
+		}
+
+		public bool ShouldCancel() => Status == StatusTypes.Fatal || (CancelOnFail && Status != StatusTypes.Complete);
+
+		#endregion
+
+		#region Finalizers
 
 		public void Complete()
 		{
@@ -101,10 +127,10 @@ public static partial class Integrations
 			}
 
 			SetStatus(StatusTypes.Complete);
-			Log($"Complete - {_exceptions.Count} excp.");
+			Log($"Complete - {_exceptions.Count:n0} excp.");
 		}
 
-		internal void OnTimeout()
+		public void Timeout()
 		{
 			if (!IsRunning)
 			{
@@ -112,10 +138,10 @@ public static partial class Integrations
 			}
 
 			SetStatus(StatusTypes.Timeout);
-			Warn($"Timed out >= {Timeout * 1000:00}ms");
+			Warn($"Timeout >= {DurationTimeout * 1000f:0}ms");
 		}
 
-		public void Fail(string message, Exception ex = null)
+		public void Fail(string message, Exception exception = null)
 		{
 			if (!IsRunning)
 			{
@@ -123,10 +149,10 @@ public static partial class Integrations
 			}
 
 			SetStatus(StatusTypes.Failed);
-			Error($"Fail - {message}", ex);
+			Error($"Fail - {message}", exception);
 		}
 
-		public void FatalFail(string message, Exception ex = null)
+		public void Fatal(string message, Exception exception = null)
 		{
 			if (!IsRunning)
 			{
@@ -134,26 +160,12 @@ public static partial class Integrations
 			}
 
 			SetStatus(StatusTypes.Fatal);
-			Error($"Fatal - {message}", ex);
+			Error($"Fatal - {message}", exception);
 		}
 
-		public bool ShouldCancel() => Status == StatusTypes.Fatal || (CancelOnFail && Status != StatusTypes.Complete);
+		#endregion
 
-		public virtual string ToPrettyString() => $"{_type.Name}.{_method.Name}|{_duration.TotalMilliseconds:0}ms|".ToLower();
-
-		public void CalculatePrettyString(out string mainString, out string spacing)
-		{
-			mainString = ToPrettyString();
-
-			var currentStringLength = mainString.Length;
-
-			if (currentStringLength > _prefixScale)
-			{
-				_prefixScale = currentStringLength;
-			}
-
-			spacing = new string(' ', _prefixScale - currentStringLength);
-		}
+		#region Logging
 
 		public void Log(object message)
 		{
@@ -178,6 +190,24 @@ public static partial class Integrations
 			Error(message, exception);
 			SetStatus(StatusTypes.Fatal);
 		}
+
+		public virtual string ToPrettyString() => $"{_type.Name}.{_method.Name}|{_duration.TotalMilliseconds:0}ms|".ToLower();
+
+		public void CalculatePrettyString(out string mainString, out string spacing)
+		{
+			mainString = ToPrettyString();
+
+			var currentStringLength = mainString.Length;
+
+			if (currentStringLength > _prefixScale)
+			{
+				_prefixScale = currentStringLength;
+			}
+
+			spacing = new string(' ', _prefixScale - currentStringLength);
+		}
+
+		#endregion
 
 		[AttributeUsage(AttributeTargets.Method)]
 		public class Assert : Test

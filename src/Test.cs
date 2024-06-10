@@ -77,21 +77,41 @@ public class Test : Attribute
 
 	public void OnSucceed()
 	{
+		if (!IsRunning)
+		{
+			return;
+		}
+
 		SetStatus(StatusTypes.Success);
 		Log($"Success");
 	}
 	public void OnTimeout()
 	{
+		if (!IsRunning)
+		{
+			return;
+		}
+
 		SetStatus(StatusTypes.Timeout);
 		Warn($"Timed out >= {Timeout * 1000:00}ms");
 	}
 	public void Fail(string reason, Exception ex = null)
 	{
+		if (!IsRunning)
+		{
+			return;
+		}
+
 		SetStatus(StatusTypes.Failure);
 		Error($"Fail - {reason}", ex);
 	}
 	public void FatalFail(string reason, Exception ex = null)
 	{
+		if (!IsRunning)
+		{
+			return;
+		}
+
 		SetStatus(StatusTypes.Fatal);
 		Error($"Fatal - {reason}", ex);
 	}
@@ -123,35 +143,53 @@ public class Test : Attribute
 	{
 		public override string ToPrettyString() => base.ToPrettyString() + "|Assert";
 
-		public static bool IsTrue(bool condition)
+		public bool IsTrue(bool condition)
 		{
-			return condition;
+			if (condition)
+			{
+				return true;
+			}
+
+			Fail($"IsTrue failed - [bool condition] {condition}");
+			return false;
 		}
-		public static bool IsFalse(bool condition)
+		public bool IsFalse(bool condition)
 		{
-			return IsTrue(condition);
+			if (!condition)
+			{
+				return true;
+			}
+
+			Fail($"IsFalse failed - [bool condition] {condition}");
+			return false;
 		}
-		public static bool IsNull(object value)
+		public bool IsNull(object value)
 		{
-			return value == null;
+			if (value == null)
+			{
+				return true;
+			}
+
+			Fail($"IsNull failed - [object value] {value}");
+			return false;
 		}
-		public static bool IsNotNull(object value)
+		public bool IsNotNull(object value)
 		{
-			return !IsNull(value);
+			if (value != null)
+			{
+				return true;
+			}
+
+			Fail($"IsNotNull failed - [object value] {value}");
+			return false;
 		}
 	}
 
 	[AttributeUsage(AttributeTargets.Method)]
 	public class WaitUntil : Test
 	{
-		internal bool Finalized;
-
 		public override string ToPrettyString() => base.ToPrettyString() + "|WaitUntil";
 
-		public void OnDone()
-		{
-			Finalized = true;
-			OnSucceed();
-		}
+
 	}
 }

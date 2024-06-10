@@ -86,6 +86,10 @@ public static class Integrations
 			yield return null;
 		}
 	}
+	public static void ClearQueue()
+	{
+		Queue.Clear();
+	}
 
 	public class TestBed : List<Test>
 	{

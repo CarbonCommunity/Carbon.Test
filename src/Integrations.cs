@@ -16,7 +16,7 @@ using ILogger = API.Logger.ILogger;
 
 namespace Carbon.Test;
 
-public static class Integrations
+public static partial class Integrations
 {
 	public static ILogger Logger { get; set; }
 	public static Stopwatch Stopwatch { get; } = new();
@@ -45,6 +45,7 @@ public static class Integrations
 	{
 		Queue.Enqueue(bed);
 	}
+
 	public static IEnumerator RunQueue(float delay)
 	{
 		while (Queue.Count != 0)
@@ -86,6 +87,7 @@ public static class Integrations
 			yield return null;
 		}
 	}
+
 	public static void ClearQueue()
 	{
 		Queue.Clear();
@@ -96,6 +98,7 @@ public static class Integrations
 		public string Context;
 
 		public TestBed() { }
+
 		public TestBed(string context)
 		{
 			Context = context;

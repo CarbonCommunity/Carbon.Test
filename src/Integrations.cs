@@ -41,7 +41,7 @@ public static partial class Integrations
 		return bed;
 	}
 
-	public static void QueueBed(TestBed bed)
+	public static void EnqueueBed(TestBed bed)
 	{
 		Queue.Enqueue(bed);
 	}
@@ -99,8 +99,6 @@ public static partial class Integrations
 	public class TestBed : List<Test>
 	{
 		public string Context;
-
-		public TestBed() { }
 
 		public TestBed(string context)
 		{

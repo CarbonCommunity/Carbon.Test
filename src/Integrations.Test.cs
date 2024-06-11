@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using API.Logger;
 
 namespace Carbon.Test;
@@ -40,6 +41,7 @@ public static partial class Integrations
 		internal StatusTypes _statusType;
 		internal static int _prefixScale;
 		internal TimeSpan _duration;
+		internal bool _isAsync;
 
 		internal static object[] _args = new object[1];
 
@@ -52,6 +54,9 @@ public static partial class Integrations
 			_type = type;
 			_method = info;
 			_target = target;
+
+			_isAsync = _method.ReturnType?.GetMethod("GetAwaiter") != null ||
+			           _method.GetCustomAttribute<AsyncStateMachineAttribute>() != null;
 		}
 
 		public void SetDuration(TimeSpan span)
@@ -83,7 +88,11 @@ public static partial class Integrations
 			try
 			{
 				_method.Invoke(_target, _args);
-				Complete();
+				
+				if (!_isAsync)
+				{
+					Complete();
+				}
 			}
 			catch (Exception exception)
 			{

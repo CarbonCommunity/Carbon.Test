@@ -20,11 +20,11 @@ public static partial class Integrations
 {
 	public static ILogger Logger { get; set; }
 	public static Stopwatch Stopwatch { get; } = new();
-	public static Queue<TestBed> Queue { get; } = new();
+	public static Queue<TestBank> Banks { get; } = new();
 
-	public static TestBed Get(string context, Type type, object target)
+	public static TestBank Get(string context, Type type, object target)
 	{
-		var bed = new TestBed(context);
+		var bed = new TestBank(context);
 
 		foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
 		{
@@ -41,20 +41,26 @@ public static partial class Integrations
 		return bed;
 	}
 
-	public static void EnqueueBed(TestBed bed)
+	public static void EnqueueBed(TestBank bank)
 	{
-		Queue.Enqueue(bed);
+		Banks.Enqueue(bank);
 	}
 
-	public static IEnumerator RunQueue(float delay)
+	public static void Run(float delay)
 	{
-		while (Queue.Count != 0)
+		ServerMgr.Instance.StartCoroutine(RunRoutine(delay));
+	}
+
+	public static IEnumerator RunRoutine(float delay)
+	{
+		while (Banks.Count != 0)
 		{
-			var bed = Queue.Dequeue();
+			var bank = Banks.Dequeue();
 			var completed = 0;
 
-			Logger.Console($"initialized testbed - context: {bed.Context}");
-			foreach (var test in bed)
+			Logger.Console($"initialized testbed - context: {bank.Context}");
+
+			foreach (var test in bank)
 			{
 				Stopwatch.Restart();
 
@@ -69,7 +75,7 @@ public static partial class Integrations
 
 				if (test.ShouldCancel())
 				{
-					Logger.Console($"cancelled due to fatal status - context: {bed.Context}", Severity.Error);
+					Logger.Console($"cancelled due to fatal status - context: {bank.Context}", Severity.Error);
 					break;
 				}
 
@@ -85,22 +91,22 @@ public static partial class Integrations
 				}
 			}
 
-			Logger.Console($"completed {completed:n0} out of {bed.Count:n0} {(bed.Count == 1 ? "test" : "tests")} - context: {bed.Context}");
+			Logger.Console($"completed {completed:n0} out of {bank.Count:n0} {(bank.Count == 1 ? "test" : "tests")} - context: {bank.Context}");
 
 			yield return null;
 		}
 	}
 
-	public static void ClearQueue()
+	public static void Clear()
 	{
-		Queue.Clear();
+		Banks.Clear();
 	}
 
-	public class TestBed : List<Test>
+	public class TestBank : List<Test>
 	{
 		public string Context;
 
-		public TestBed(string context)
+		public TestBank(string context)
 		{
 			Context = context;
 		}

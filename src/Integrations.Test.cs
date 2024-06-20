@@ -17,7 +17,7 @@ namespace Carbon.Test;
 public static partial class Integrations
 {
 	[AttributeUsage(AttributeTargets.Method)]
-	public class Test : Attribute
+	public partial class Test : Attribute
 	{
 		public float DurationTimeout = 1000f;
 		public bool CancelOnFail = true;
@@ -27,6 +27,7 @@ public static partial class Integrations
 			None,
 			Running,
 			Complete,
+			Canceled,
 			Failed,
 			Fatal,
 			Timeout
@@ -88,7 +89,7 @@ public static partial class Integrations
 			try
 			{
 				_method.Invoke(_target, _args);
-				
+
 				if (!_isAsync)
 				{
 					Complete();

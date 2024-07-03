@@ -7,6 +7,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -41,7 +42,7 @@ public static partial class Integrations
 		internal object _target;
 		internal StatusTypes _statusType;
 		internal static int _prefixScale;
-		internal TimeSpan _duration;
+		internal double _duration;
 		internal bool _isAsync;
 
 		internal static object[] _args = new object[1];
@@ -62,7 +63,7 @@ public static partial class Integrations
 
 		public void SetDuration(TimeSpan span)
 		{
-			_duration = span;
+			_duration = span.TotalMilliseconds;
 		}
 
 		public void SetStatus(StatusTypes status)
@@ -109,7 +110,7 @@ public static partial class Integrations
 				return;
 			}
 
-			if (_duration.TotalSeconds >= DurationTimeout)
+			if (_duration >= DurationTimeout)
 			{
 				Timeout();
 			}
@@ -148,7 +149,7 @@ public static partial class Integrations
 			}
 
 			SetStatus(StatusTypes.Timeout);
-			Warn($"Timeout >= {DurationTimeout * 1000f:0}ms");
+			Warn($"Timeout >= {DurationTimeout:0}ms");
 		}
 
 		public void Fail(string message, Exception exception = null)
@@ -177,6 +178,14 @@ public static partial class Integrations
 
 		#region Logging
 
+		public string GetFrameString()
+		{
+			var stacktrace = new StackTrace(FrameOffset, true);
+			var frame = stacktrace.GetFrame(0);
+
+			return $"{System.IO.Path.GetFileNameWithoutExtension(frame.GetFileName())}|line {frame.GetFileLineNumber()}:{frame.GetFileColumnNumber()}";
+		}
+
 		public void Log(object message)
 		{
 			CalculatePrettyString(out var main, out var second);
@@ -193,15 +202,19 @@ public static partial class Integrations
 		{
 			CalculatePrettyString(out var main, out var second);
 			Logger.Console($"{second}{main}  {(message == null ? "no message" : message.ToString())}", Severity.Error, exception);
+
+			SetStatus(StatusTypes.Failed);
 		}
 
 		public void Fatal(object message, Exception exception)
 		{
-			Error(message, exception);
+			CalculatePrettyString(out var main, out var second);
+			Logger.Console($"{second}{main}  {(message == null ? "no message" : message.ToString())}", Severity.Error, exception);
+
 			SetStatus(StatusTypes.Fatal);
 		}
 
-		public virtual string ToPrettyString() => $"{_type.Name}.{_method.Name}|{_duration.TotalMilliseconds:0}ms|".ToLower();
+		public virtual string ToPrettyString() => $"{_type.Name}.{_method.Name}|{GetFrameString()}|{_duration.TotalMilliseconds:0}ms|".ToLower();
 
 		public void CalculatePrettyString(out string mainString, out string spacing)
 		{

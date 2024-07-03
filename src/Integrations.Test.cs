@@ -214,7 +214,7 @@ public static partial class Integrations
 			SetStatus(StatusTypes.Fatal);
 		}
 
-		public virtual string ToPrettyString() => $"{_type.Name}.{_method.Name}|{GetFrameString()}|{_duration.TotalMilliseconds:0}ms|".ToLower();
+		public virtual string ToPrettyString() => $"{_type.Name}.{_method.Name}|{GetFrameString()}|{_duration:0}ms|".ToLower();
 
 		public void CalculatePrettyString(out string mainString, out string spacing)
 		{

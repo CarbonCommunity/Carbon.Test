@@ -178,14 +178,6 @@ public static partial class Integrations
 
 		#region Logging
 
-		public string GetFrameString()
-		{
-			var stacktrace = new StackTrace(FrameOffset, true);
-			var frame = stacktrace.GetFrame(0);
-
-			return $"{System.IO.Path.GetFileNameWithoutExtension(frame.GetFileName())}|line {frame.GetFileLineNumber()}:{frame.GetFileColumnNumber()}";
-		}
-
 		public void Log(object message)
 		{
 			CalculatePrettyString(out var main, out var second);
@@ -214,7 +206,7 @@ public static partial class Integrations
 			SetStatus(StatusTypes.Fatal);
 		}
 
-		public virtual string ToPrettyString() => $"{_type.Name}.{_method.Name}|{GetFrameString()}|{_duration:0}ms|".ToLower();
+		public virtual string ToPrettyString() => $"{_type.Name}.{_method.Name}|{_duration:0}ms|".ToLower();
 
 		public void CalculatePrettyString(out string mainString, out string spacing)
 		{
@@ -237,51 +229,51 @@ public static partial class Integrations
 		{
 			public override string ToPrettyString() => base.ToPrettyString() + "assert|";
 
-			public bool IsTrue(bool condition)
+			public bool IsTrue(bool condition, string info = null)
 			{
 				if (condition)
 				{
-					Warn($"IsTrue passed    - [bool condition] {condition}");
+					Warn($"IsTrue passed    - {(string.IsNullOrEmpty(info) ? "[bool condition]" : info)}");
 ;					return true;
 				}
 
-				Fail($"IsTrue failed    - [bool condition] {condition}");
+				Fail($"IsTrue failed    - {(string.IsNullOrEmpty(info) ? "[bool condition]" : info)}");
 				return false;
 			}
 
-			public bool IsFalse(bool condition)
+			public bool IsFalse(bool condition, string info = null)
 			{
 				if (!condition)
 				{
-					Warn($"IsFalse passed   - [bool condition] {condition}");
+					Warn($"IsFalse passed   - {(string.IsNullOrEmpty(info) ? "[bool condition]" : info)}");
 					return true;
 				}
 
-				Fail($"IsFalse failed   - [bool condition] {condition}");
+				Fail($"IsFalse failed   - {(string.IsNullOrEmpty(info) ? "[bool condition]" : info)}");
 				return false;
 			}
 
-			public bool IsNull(object value)
+			public bool IsNull(object value, string info = null)
 			{
 				if (value == null)
 				{
-					Warn($"IsNull passed    - [object value] {value}");
+					Warn($"IsNull passed    - {(string.IsNullOrEmpty(info) ? "[object value]" : info)} == null");
 					return true;
 				}
 
-				Fail($"IsNull failed    - [object value] {value}");
+				Fail($"IsNull failed    - {(string.IsNullOrEmpty(info) ? "[object value]" : info)} == {value}");
 				return false;
 			}
 
-			public bool IsNotNull(object value)
+			public bool IsNotNull(object value, string info = null)
 			{
 				if (value != null)
 				{
-					Warn($"IsNotNull passed - [object value] {value}");
+					Warn($"IsNotNull passed - {(string.IsNullOrEmpty(info) ? "[object value]" : info)} == {value}");
 					return true;
 				}
 
-				Fail($"IsNotNull failed - [object value] {value}");
+				Fail($"IsNotNull failed - {(string.IsNullOrEmpty(info) ? "[object value]" : info)} = null");
 				return false;
 			}
 		}

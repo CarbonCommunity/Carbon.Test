@@ -18,8 +18,6 @@ namespace Carbon.Test;
 
 public static partial class Integrations
 {
-	public static int FrameOffset = 3;
-
 	public static ILogger Logger { get; set; }
 	public static Stopwatch Stopwatch { get; } = new();
 	public static Queue<TestBank> Banks { get; } = new();

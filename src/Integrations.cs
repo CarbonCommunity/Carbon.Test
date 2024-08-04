@@ -1,11 +1,4 @@
-﻿/*
- *
- * Copyright (c) 2024 Carbon Community
- * All rights reserved.
- *
- */
-
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;

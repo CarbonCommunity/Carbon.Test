@@ -1,13 +1,5 @@
-﻿/*
- *
- * Copyright (c) 2024 Carbon Community
- * All rights reserved.
- *
- */
-
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -18,7 +10,7 @@ namespace Carbon.Test;
 public static partial class Integrations
 {
 	[AttributeUsage(AttributeTargets.Method)]
-	public partial class Test : Attribute
+	public class Test : Attribute
 	{
 		public float DurationTimeout = 1000f;
 		public bool CancelOnFail = true;

@@ -18,6 +18,10 @@ public static partial class Integrations
 	public static readonly Stopwatch Stopwatch = new();
 	public static readonly Dictionary<int, Queue<TestBank>> Banks = [];
 
+	private static bool _isRunning;
+
+	public static bool IsRunning() => _isRunning;
+
 	public static TestBank Get(string context, Type type, object target, int channel = DEFAULT_CHANNEL)
 	{
 		var bed = new TestBank(channel, context);
@@ -62,20 +66,39 @@ public static partial class Integrations
 
 	public static IEnumerator RunRoutine(float delay, int channel)
 	{
+		if (_isRunning)
+		{
+			yield break;
+		}
+
+		_isRunning = true;
+
 		var banks = Pool.Get<List<TestBank>>();
 
 		switch (channel)
 		{
 			case -1:
+			{
 				foreach (var queue in Banks.Values)
 				{
 					while (queue.Count != 0)
 					{
-						var bank = queue.Dequeue();
-						banks.Add(bank);
+						banks.Add(queue.Dequeue());
 					}
 				}
 				break;
+			}
+			default:
+			{
+				if (Banks.TryGetValue(channel, out var queue))
+				{
+					while (queue.Count != 0)
+					{
+						banks.Add(queue.Dequeue());
+					}
+				}
+				break;
+			}
 		}
 
 		for (int i = 0; i < banks.Count; i++)
@@ -84,6 +107,8 @@ public static partial class Integrations
 		}
 
 		Pool.FreeUnmanaged(ref banks);
+
+		_isRunning = false;
 	}
 
 	public static IEnumerator RunBankRoutine(float delay, TestBank bank)

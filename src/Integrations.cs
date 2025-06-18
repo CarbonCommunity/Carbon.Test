@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
 using API.Logger;
+using Facepunch;
 using UnityEngine;
 using ILogger = API.Logger.ILogger;
 
@@ -11,98 +12,139 @@ namespace Carbon.Test;
 
 public static partial class Integrations
 {
-	public static ILogger Logger { get; set; }
-	public static Stopwatch Stopwatch { get; } = new();
-	public static Queue<TestBank> Banks { get; } = new();
+	public const int DEFAULT_CHANNEL = 1;
 
-	public static TestBank Get(string context, Type type, object target)
+	public static ILogger Logger;
+	public static readonly Stopwatch Stopwatch = new();
+	public static readonly Dictionary<int, Queue<TestBank>> Banks = [];
+
+	public static TestBank Get(string context, Type type, object target, int channel = DEFAULT_CHANNEL)
 	{
-		var bed = new TestBank(context);
+		var bed = new TestBank(channel, context);
 
 		foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
 		{
-			var attribute = method.GetCustomAttribute<Test>();
+			var test = method.GetCustomAttribute<Test>();
 
-			if (attribute == null)
+			if (test == null || test.Channel != channel)
 			{
 				continue;
 			}
 
-			bed.AddTest(target, type, method, attribute);
+			bed.AddTest(target, type, method, test);
 		}
 
 		return bed;
 	}
 
+	/// <summary>
+	/// Manual addition of a Test bank to be ran when executed
+	/// </summary>
+	/// <param name="bank"></param>
 	public static void EnqueueBed(TestBank bank)
 	{
-		Banks.Enqueue(bank);
-	}
-
-	public static void Run(float delay)
-	{
-		ServerMgr.Instance.StartCoroutine(RunRoutine(delay));
-	}
-
-	public static IEnumerator RunRoutine(float delay)
-	{
-		while (Banks.Count != 0)
+		if (!Banks.TryGetValue(bank.Channel, out var queue))
 		{
-			var bank = Banks.Dequeue();
-			var completed = 0;
+			Banks[bank.Channel] = queue = new Queue<TestBank>();
+		}
+		queue.Enqueue(bank);
+	}
 
-			Logger.Console($"initialized testbed - context: {bank.Context}");
+	/// <summary>
+	/// Executes all available Test banks for a specific channel (or all channels when "channel" is -1).
+	/// </summary>
+	/// <param name="delay">Starting delay of the test run</param>
+	/// <param name="channel">Test channel the run should run on</param>
+	public static void Run(float delay, int channel)
+	{
+		ServerMgr.Instance.StartCoroutine(RunRoutine(delay, channel));
+	}
 
-			foreach (var test in bank)
+	public static IEnumerator RunRoutine(float delay, int channel)
+	{
+		var banks = Pool.Get<List<TestBank>>();
+
+		switch (channel)
+		{
+			case -1:
+				foreach (var queue in Banks.Values)
+				{
+					while (queue.Count != 0)
+					{
+						var bank = queue.Dequeue();
+						banks.Add(bank);
+					}
+				}
+				break;
+		}
+
+		for (int i = 0; i < banks.Count; i++)
+		{
+			yield return RunBankRoutine(delay, banks[i]);
+		}
+
+		Pool.FreeUnmanaged(ref banks);
+	}
+
+	public static IEnumerator RunBankRoutine(float delay, TestBank bank)
+	{
+		var completed = 0;
+
+		Logger.Console($"initialized testbed - context: {bank.Context}");
+
+		foreach (var test in bank)
+		{
+			Stopwatch.Restart();
+
+			test.Run();
+
+			while (test.IsRunning)
 			{
-				Stopwatch.Restart();
-
-				test.Run();
-
-				while (test.IsRunning)
-				{
-					test.SetDuration(Stopwatch.Elapsed);
-					test.RunCheck();
-					yield return null;
-				}
-
-				if (test.ShouldCancel())
-				{
-					Logger.Console($"cancelled due to fatal status - context: {bank.Context}", Severity.Error);
-					break;
-				}
-
-				completed++;
-
-				if (delay > 0)
-				{
-					yield return CoroutineEx.waitForSecondsRealtime(delay);
-				}
-				else
-				{
-					yield return null;
-				}
+				test.SetDuration(Stopwatch.Elapsed);
+				test.RunCheck();
+				yield return null;
 			}
 
-			Logger.Console($"completed {completed:n0} out of {bank.Count:n0} {(bank.Count == 1 ? "test" : "tests")} - context: {bank.Context}");
+			if (test.ShouldCancel())
+			{
+				Logger.Console($"cancelled due to fatal status - context: {bank.Context}", Severity.Error);
+				break;
+			}
 
-			yield return null;
+			completed++;
+
+			if (delay > 0)
+			{
+				yield return CoroutineEx.waitForSecondsRealtime(delay);
+			}
+			else
+			{
+				yield return null;
+			}
 		}
+
+		Logger.Console($"completed {completed:n0} out of {bank.Count:n0} {(bank.Count == 1 ? "test" : "tests")} - context: {bank.Context}");
+
+		yield return null;
 	}
 
-	public static void Clear()
+	public static void Clear(int channel)
 	{
-		Banks.Clear();
-	}
-
-	public class TestBank : List<Test>
-	{
-		public string Context;
-
-		public TestBank(string context)
+		switch (channel)
 		{
-			Context = context;
+			case -1:
+				Banks.Clear();
+				break;
+			default:
+				Banks.Remove(channel);
+				break;
 		}
+	}
+
+	public class TestBank(int channel, string context) : List<Test>
+	{
+		public int Channel = channel;
+		public string Context = context;
 
 		public void AddTest(object target, Type type, MethodInfo method, Test test)
 		{

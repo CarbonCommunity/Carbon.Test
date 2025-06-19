@@ -22,20 +22,20 @@ public static partial class Integrations
 
 	public static bool IsRunning() => _isRunning;
 
-	public static TestBank Get(string context, Type type, object target, int channel = DEFAULT_CHANNEL)
+	public static TestBank Get(string context, Type type, object target = null, int channel = DEFAULT_CHANNEL)
 	{
-		var bed = new TestBank(channel, context);
+		var bed = (TestBank)null;
 
 		foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
 		{
 			var test = method.GetCustomAttribute<Test>();
 
-			if (test == null || test.Channel != channel)
+			if (test == null || (channel != -1 && test.Channel != channel))
 			{
 				continue;
 			}
 
-			bed.AddTest(target, type, method, test);
+			(bed ??= new TestBank(channel, context)).AddTest((target ??= Activator.CreateInstance(type)), type, method, test);
 		}
 
 		return bed;
@@ -176,5 +176,10 @@ public static partial class Integrations
 			test.Setup(target, type, method);
 			Add(test);
 		}
+	}
+
+	public interface ITestable
+	{
+		void CollectTests(int channel);
 	}
 }

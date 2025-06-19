@@ -20,7 +20,7 @@ public static partial class Integrations
 		/// <summary>
 		/// The time ceiling constraint of what the test is expected to take. 0 to disable timeout.
 		/// </summary>
-		public float DurationTimeout = 1000f;
+		public float Timeout = 1000f;
 
 		/// <summary>
 		/// Cancel the test altogether at any failure
@@ -64,16 +64,16 @@ public static partial class Integrations
 
 		#region Internal
 
-		internal List<Exception> _exceptions = new();
-		internal Type _type;
-		internal MethodInfo _method;
-		internal object _target;
-		internal StatusTypes _statusType;
-		internal static int _prefixScale;
-		internal double _duration;
-		internal bool _isAsync;
+		private List<Exception> _exceptions = new();
+		private Type _type;
+		private MethodInfo _method;
+		private object _target;
+		private StatusTypes _statusType;
+		private static int _prefixScale;
+		private double _duration;
+		private bool _isAsync;
 
-		internal static object[] _args = new object[1];
+		private static object[] _args = new object[1];
 
 		#endregion
 
@@ -84,7 +84,6 @@ public static partial class Integrations
 			_type = type;
 			_method = info;
 			_target = target;
-
 			_isAsync = _method.ReturnType?.GetMethod("GetAwaiter") != null ||
 			           _method.GetCustomAttribute<AsyncStateMachineAttribute>() != null;
 		}
@@ -117,7 +116,7 @@ public static partial class Integrations
 
 			try
 			{
-				_method.Invoke(_target, _args);
+				_method.Invoke(_target, _method.GetParameters().Length == 1 ? _args : Array.Empty<object>());
 
 				if (!_isAsync)
 				{
@@ -133,14 +132,14 @@ public static partial class Integrations
 
 		public void RunCheck()
 		{
-			if (DurationTimeout <= 0)
+			if (Timeout <= 0)
 			{
 				return;
 			}
 
-			if (_duration >= DurationTimeout)
+			if (_duration >= Timeout)
 			{
-				Timeout();
+				TimeOut();
 			}
 		}
 
@@ -169,7 +168,7 @@ public static partial class Integrations
 			Log($"Complete - {_exceptions.Count:n0} excp.");
 		}
 
-		public void Timeout()
+		public void TimeOut()
 		{
 			if (!IsRunning)
 			{
@@ -177,7 +176,7 @@ public static partial class Integrations
 			}
 
 			SetStatus(StatusTypes.Timeout);
-			Warn($"Timeout >= {DurationTimeout:0}ms");
+			Warn($"Timeout >= {Timeout:0}ms");
 		}
 
 		public void Fail(string message, Exception exception = null)

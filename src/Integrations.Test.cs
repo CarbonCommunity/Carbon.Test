@@ -12,17 +12,53 @@ public static partial class Integrations
 	[AttributeUsage(AttributeTargets.Method)]
 	public class Test : Attribute
 	{
+		/// <summary>
+		/// The testing bed channel the test should run under (defaults to 1). Best used to execute tests selectively.
+		/// </summary>
+		public int Channel = DEFAULT_CHANNEL;
+
+		/// <summary>
+		/// The time ceiling constraint of what the test is expected to take. 0 to disable timeout.
+		/// </summary>
 		public float DurationTimeout = 1000f;
+
+		/// <summary>
+		/// Cancel the test altogether at any failure
+		/// </summary>
 		public bool CancelOnFail = true;
 
 		public enum StatusTypes
 		{
 			None,
+
+			/// <summary>
+			/// It's currently executing
+			/// </summary>
 			Running,
+
+			/// <summary>
+			/// Has been successfully completed
+			/// </summary>
 			Complete,
+
+			/// <summary>
+			/// Has been cancelled manually or programmatically
+			/// </summary>
 			Canceled,
+
+			/// <summary>
+			/// Has successfully failed
+			/// </summary>
 			Failed,
+
+			/// <summary>
+			/// Major error(s) occurred, which caused the test to end
+			/// </summary>
 			Fatal,
+
+			/// <summary>
+			/// The test took longer than expected
+			/// </summary>
 			Timeout
 		}
 

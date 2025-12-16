@@ -151,7 +151,7 @@ public static partial class Integrations
 			SetDuration(default);
 		}
 
-		public bool ShouldCancel() => Status == StatusTypes.Fatal || (CancelOnFail && Status != StatusTypes.Complete);
+		public bool HasFailedFatally() => Status == StatusTypes.Fatal || (CancelOnFail && Status != StatusTypes.Complete);
 
 		#endregion
 

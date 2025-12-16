@@ -107,7 +107,7 @@ public static partial class Integrations
 		}
 
 		Pool.FreeUnmanaged(ref banks);
-
+		
 		_isRunning = false;
 	}
 
@@ -115,6 +115,7 @@ public static partial class Integrations
 	{
 		var completed = 0;
 
+		Environment.ExitCode = 0;
 		Logger.Console($"initialized testbed - context: {bank.Context}");
 
 		foreach (var test in bank)
@@ -130,9 +131,10 @@ public static partial class Integrations
 				yield return null;
 			}
 
-			if (test.ShouldCancel())
+			if (test.HasFailedFatally())
 			{
 				Logger.Console($"cancelled due to fatal status - context: {bank.Context}", Severity.Error);
+				Environment.ExitCode = -1;
 				break;
 			}
 

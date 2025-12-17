@@ -17,6 +17,7 @@ public static partial class Integrations
 	public static ILogger Logger;
 	public static readonly Stopwatch Stopwatch = new();
 	public static readonly Dictionary<int, Queue<TestBank>> Banks = [];
+	public static Action OnFatalFailure;
 
 	private static bool _isRunning;
 
@@ -103,11 +104,24 @@ public static partial class Integrations
 
 		for (int i = 0; i < banks.Count; i++)
 		{
-			yield return RunBankRoutine(delay, banks[i]);
+			var bank = banks[i];
+			yield return RunBankRoutine(delay, bank);
+			if (bank.AnyTestsFailedFatally())
+			{
+				try
+				{
+					OnFatalFailure?.Invoke();
+				}
+				catch (Exception ex)
+				{
+					Logger.Console("Fatal test failure callback error", Severity.Error, ex);
+				}
+				break;
+			}
 		}
 
 		Pool.FreeUnmanaged(ref banks);
-		
+
 		_isRunning = false;
 	}
 
@@ -118,10 +132,11 @@ public static partial class Integrations
 		Environment.ExitCode = 0;
 		Logger.Console($"initialized testbed - context: {bank.Context}");
 
-		foreach (var test in bank)
+		for(int i = 0; i < bank.Count; i++)
 		{
 			Stopwatch.Restart();
 
+			var test = bank[i];
 			test.Run();
 
 			while (test.IsRunning)
@@ -177,6 +192,19 @@ public static partial class Integrations
 		{
 			test.Setup(target, type, method);
 			Add(test);
+		}
+
+		public bool AnyTestsFailedFatally()
+		{
+			for (int i = 0; i < Count; i++)
+			{
+				var test = this[i];
+				if (test.HasFailedFatally())
+				{
+					return true;
+				}
+			}
+			return false;
 		}
 	}
 

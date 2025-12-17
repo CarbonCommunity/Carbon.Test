@@ -18,11 +18,12 @@ public static partial class Integrations
 	public static readonly Stopwatch Stopwatch = new();
 	public static readonly Dictionary<int, Queue<TestBank>> Banks = [];
 	public static Action OnFatalTestFailure;
+	public static ExitCodes ExitCode;
 
 	public enum ExitCodes
 	{
 		Ok = 0,
-		FatalFailure = 400
+		FatalFailure = -1
 	}
 
 	private static bool _isRunning;
@@ -128,6 +129,7 @@ public static partial class Integrations
 		{
 			if (anyTestsFailedFatally)
 			{
+				ExitCode = ExitCodes.FatalFailure;
 				OnFatalTestFailure?.Invoke();
 			}
 		}
@@ -141,7 +143,6 @@ public static partial class Integrations
 	{
 		var completed = 0;
 
-		Environment.ExitCode = (int)ExitCodes.Ok;
 		Logger.Console($"initialized testbed - context: {bank.Context}");
 
 		for(int i = 0; i < bank.Count; i++)
@@ -161,11 +162,11 @@ public static partial class Integrations
 			if (test.HasFailedFatally())
 			{
 				Logger.Console($"cancelled due to fatal status - context: {bank.Context}", Severity.Error);
-				Environment.ExitCode = (int)ExitCodes.FatalFailure;
 				break;
 			}
 
 			completed++;
+			ExitCode = ExitCodes.Ok;
 
 			if (delay > 0)
 			{

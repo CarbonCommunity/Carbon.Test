@@ -17,7 +17,7 @@ public static partial class Integrations
 	public static ILogger Logger;
 	public static readonly Stopwatch Stopwatch = new();
 	public static readonly Dictionary<int, Queue<TestBank>> Banks = [];
-	public static Action OnFatalFailure;
+	public static Action OnFatalTestFailure;
 
 	private static bool _isRunning;
 
@@ -102,20 +102,14 @@ public static partial class Integrations
 			}
 		}
 
+		var anyTestsFailedFatally = false;
 		for (int i = 0; i < banks.Count; i++)
 		{
 			var bank = banks[i];
 			yield return RunBankRoutine(delay, bank);
 			if (bank.AnyTestsFailedFatally())
 			{
-				try
-				{
-					OnFatalFailure?.Invoke();
-				}
-				catch (Exception ex)
-				{
-					Logger.Console("Fatal test failure callback error", Severity.Error, ex);
-				}
+				anyTestsFailedFatally = true;
 				break;
 			}
 		}
@@ -123,6 +117,18 @@ public static partial class Integrations
 		Pool.FreeUnmanaged(ref banks);
 
 		_isRunning = false;
+
+		try
+		{
+			if (anyTestsFailedFatally)
+			{
+				OnFatalTestFailure?.Invoke();
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.Console("Fatal test failure callback error", Severity.Error, ex);
+		}
 	}
 
 	public static IEnumerator RunBankRoutine(float delay, TestBank bank)

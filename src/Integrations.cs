@@ -19,6 +19,12 @@ public static partial class Integrations
 	public static readonly Dictionary<int, Queue<TestBank>> Banks = [];
 	public static Action OnFatalTestFailure;
 
+	public enum ExitCodes
+	{
+		Ok = 0,
+		FatalFailure = 400
+	}
+
 	private static bool _isRunning;
 
 	public static bool IsRunning() => _isRunning;
@@ -135,7 +141,7 @@ public static partial class Integrations
 	{
 		var completed = 0;
 
-		Environment.ExitCode = 0;
+		Environment.ExitCode = (int)ExitCodes.Ok;
 		Logger.Console($"initialized testbed - context: {bank.Context}");
 
 		for(int i = 0; i < bank.Count; i++)
@@ -155,7 +161,7 @@ public static partial class Integrations
 			if (test.HasFailedFatally())
 			{
 				Logger.Console($"cancelled due to fatal status - context: {bank.Context}", Severity.Error);
-				Environment.ExitCode = -1;
+				Environment.ExitCode = (int)ExitCodes.FatalFailure;
 				break;
 			}
 
